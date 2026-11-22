@@ -104,7 +104,7 @@ def process_job(job_id, src, clip_len, count):
             # Fill a 9:16 canvas, crop to portrait; use subtitles if speech was detected.
             vf = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"
             if has_subs:
-                vf += f",subtitles='{str(srt).replace(chr(92), '/').replace(':', r'\\:')}'"
+                vf += ",subtitles='" + str(srt).replace("\\", "/").replace(":", "\\:") + "'"
             run(["ffmpeg", "-y", "-ss", str(start), "-i", str(src), "-t", str(end-start),
                  "-vf", vf, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
                  "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(out)])
