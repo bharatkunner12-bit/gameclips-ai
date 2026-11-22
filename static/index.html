@@ -1,0 +1,62 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090d18"><title>GameClips AI</title>
+<style>
+:root{color-scheme:dark;--bg:#090d18;--card:#121a2b;--muted:#98a6bf;--line:#26334b;--accent:#8b5cf6;--cyan:#22d3ee}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#172443 0,#090d18 55%);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f8fafc;min-height:100vh}
+main{max-width:720px;margin:auto;padding:28px 18px 60px}.brand{display:flex;align-items:center;gap:12px;margin-bottom:26px}.logo{width:48px;height:48px;border-radius:15px;background:linear-gradient(135deg,var(--accent),var(--cyan));display:grid;place-items:center;font-size:24px}
+h1{font-size:27px;margin:0;letter-spacing:-.7px}.sub{color:var(--muted);font-size:14px;margin-top:5px}
+.panel{background:rgba(18,26,43,.94);border:1px solid var(--line);border-radius:22px;padding:20px;margin:16px 0;box-shadow:0 18px 45px #0003}
+label{display:block;font-size:13px;color:#cbd5e1;margin:15px 0 8px;font-weight:650}input,select{width:100%;background:#0b1220;color:white;border:1px solid #34435d;border-radius:12px;padding:14px;font-size:15px}
+input[type=file]{padding:12px}button{width:100%;border:0;border-radius:14px;padding:16px;margin-top:18px;background:linear-gradient(100deg,#7c3aed,#0891b2);color:white;font-weight:800;font-size:16px}
+.hint{font-size:12px;line-height:1.5;color:var(--muted);margin-top:8px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.status{margin-top:16px;padding:14px;border:1px solid var(--line);background:#0b1220;border-radius:13px;color:#dbeafe;display:none}
+.clip{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding:13px 0}.clip a{color:#67e8f9;font-weight:700;text-decoration:none;white-space:nowrap}.tag{color:#a5b4fc;font-size:12px}
+footer{font-size:11px;color:#8090aa;line-height:1.55;text-align:center;margin:22px 4px}
+</style>
+</head>
+<body><main>
+<div class="brand"><div class="logo">🎮</div><div><h1>GameClips AI</h1><div class="sub">Long gameplay → ready-to-review Shorts</div></div></div>
+<div class="panel">
+  <div style="font-size:18px;font-weight:800">Create gaming highlights</div>
+  <div class="sub">Upload an authorized gameplay video. AI will find candidate moments and format them vertically.</div>
+  <form id="form">
+    <label>Video source link (optional reference)</label>
+    <input name="source_url" type="url" placeholder="Paste YouTube link for your reference">
+    <div class="hint">A link alone cannot provide the video file. Upload your own gameplay or a file the creator has given you permission to edit.</div>
+    <label>Choose gameplay video</label>
+    <input name="video" type="file" accept="video/mp4,video/quicktime,video/x-m4v,video/x-matroska,video/webm" required>
+    <div class="grid">
+      <div><label>Clip length</label><select name="clip_length"><option value="30">30 seconds</option><option value="45" selected>45 seconds</option><option value="60">60 seconds</option></select></div>
+      <div><label>Number of clips</label><select name="clip_count"><option>3</option><option selected>5</option><option>7</option><option>10</option></select></div>
+    </div>
+    <button id="submit" type="submit">✨ Generate Shorts</button>
+  </form>
+  <div id="status" class="status"></div>
+</div>
+<div class="panel" id="results" style="display:none"><div style="font-weight:800;font-size:18px;margin-bottom:8px">Your clips</div><div id="cliplist"></div></div>
+<footer>Use only content you own or are authorized to edit. Automated edits do not remove copyright obligations or guarantee YouTube monetization. Review every clip before publishing.</footer>
+</main>
+<script>
+const form=document.getElementById('form'),statusBox=document.getElementById('status'),button=document.getElementById('submit');
+form.addEventListener('submit',async e=>{
+ e.preventDefault();button.disabled=true;button.textContent='Uploading…';statusBox.style.display='block';statusBox.textContent='Uploading your video…';document.getElementById('results').style.display='none';
+ try{
+  const data=new FormData(form);const r=await fetch('/api/create',{method:'POST',body:data});const j=await r.json();if(!r.ok)throw new Error(j.detail||'Upload failed');
+  statusBox.textContent='Video received. Finding highlights…';poll(j.job_id);
+ }catch(err){statusBox.textContent='Error: '+err.message;button.disabled=false;button.textContent='✨ Generate Shorts'}
+});
+async function poll(id){
+ try{const r=await fetch('/api/status/'+id);const j=await r.json();statusBox.textContent=j.status+(j.error?': '+j.error:'');
+  if(j.status==='Done'){
+   const box=document.getElementById('results'),list=document.getElementById('cliplist');box.style.display='block';list.innerHTML='';
+   j.clips.forEach(c=>{const row=document.createElement('div');row.className='clip';const left=document.createElement('div');left.innerHTML='<strong>'+c.name+'</strong><div class="tag">From '+c.start+'s · '+c.duration+'s</div>';const a=document.createElement('a');a.href=c.url;a.textContent='Download MP4 ↓';a.setAttribute('download','');row.append(left,a);list.append(row)});
+   statusBox.textContent='Done! Review your clips before uploading.';button.disabled=false;button.textContent='✨ Generate More Shorts';return;
+  }
+  if(j.status==='Error'){button.disabled=false;button.textContent='✨ Try Again';return}
+  setTimeout(()=>poll(id),4000);
+ }catch(e){statusBox.textContent='Could not check progress: '+e.message;button.disabled=false;button.textContent='✨ Try Again'}
+}
+</script></body></html>
