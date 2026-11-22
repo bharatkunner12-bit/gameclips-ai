@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: gameclips-ai
+    runtime: docker
+    plan: starter
+    healthCheckPath: /
+    disk:
+      name: gameclips-data
+      mountPath: /app/data
+      sizeGB: 10
