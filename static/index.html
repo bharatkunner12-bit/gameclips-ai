@@ -92,6 +92,11 @@ input, select {
   font-size: 15px;
 }
 
+input[type="file"] {
+  padding: 12px;
+  cursor: pointer;
+}
+
 button {
   width: 100%;
   border: 0;
@@ -102,10 +107,12 @@ button {
   color: white;
   font-weight: 800;
   font-size: 16px;
+  cursor: pointer;
 }
 
 button:disabled {
   opacity: .6;
+  cursor: not-allowed;
 }
 
 .hint {
@@ -121,6 +128,43 @@ button:disabled {
   gap: 12px;
 }
 
+.source-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.source-option {
+  border: 1px solid var(--line);
+  background: #0b1220;
+  border-radius: 12px;
+  padding: 13px;
+  text-align: center;
+  cursor: pointer;
+  color: #cbd5e1;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.source-option.active {
+  border-color: var(--cyan);
+  background: #102536;
+  color: #67e8f9;
+}
+
+.source-option input {
+  display: none;
+}
+
+.source-section {
+  display: none;
+}
+
+.source-section.active {
+  display: block;
+}
+
 .status {
   margin-top: 16px;
   padding: 14px;
@@ -129,6 +173,7 @@ button:disabled {
   border-radius: 13px;
   color: #dbeafe;
   display: none;
+  overflow-wrap: anywhere;
 }
 
 .clip {
@@ -159,6 +204,24 @@ footer {
   text-align: center;
   margin: 22px 4px;
 }
+
+@media (max-width: 420px) {
+  main {
+    padding: 22px 14px 45px;
+  }
+
+  .panel {
+    padding: 17px;
+  }
+
+  .clip {
+    align-items: flex-start;
+  }
+
+  .clip a {
+    font-size: 13px;
+  }
+}
 </style>
 </head>
 
@@ -180,29 +243,81 @@ footer {
   </div>
 
   <div class="sub">
-    Paste a YouTube gameplay link. AI will download and analyze the video, then create vertical clips.
+    Add a YouTube gameplay link or upload a video.
+    AI will analyze it and create vertical clips.
   </div>
 
   <form id="form">
 
-    <label for="source_url">YouTube gameplay link</label>
+    <div class="source-choice">
 
-    <input
-      id="source_url"
-      name="source_url"
-      type="url"
-      placeholder="https://youtu.be/..."
-      required
-    >
+      <label class="source-option active" id="urlChoice">
+        <input
+          type="radio"
+          name="source_type"
+          value="url"
+          checked
+        >
+        🔗 YouTube Link
+      </label>
 
-    <div class="hint">
-      Use a video you own or have permission to edit.
+      <label class="source-option" id="fileChoice">
+        <input
+          type="radio"
+          name="source_type"
+          value="file"
+        >
+        📁 Upload Video
+      </label>
+
+    </div>
+
+    <div class="source-section active" id="urlSection">
+
+      <label for="source_url">
+        YouTube gameplay link
+      </label>
+
+      <input
+        id="source_url"
+        name="source_url"
+        type="url"
+        placeholder="https://youtu.be/..."
+      >
+
+      <div class="hint">
+        If YouTube asks for sign-in verification,
+        try uploading the video file instead.
+      </div>
+
+    </div>
+
+    <div class="source-section" id="fileSection">
+
+      <label for="video_file">
+        Select gameplay video
+      </label>
+
+      <input
+        id="video_file"
+        name="video_file"
+        type="file"
+        accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-msvideo,.mp4,.mov,.mkv,.webm,.avi"
+      >
+
+      <div class="hint">
+        Supported: MP4, MOV, MKV, WEBM, AVI.
+        Maximum file size: 500 MB.
+      </div>
+
     </div>
 
     <div class="grid">
 
       <div>
-        <label for="clip_length">Clip length</label>
+        <label for="clip_length">
+          Clip length
+        </label>
 
         <select id="clip_length" name="clip_length">
           <option value="30">30 seconds</option>
@@ -212,7 +327,9 @@ footer {
       </div>
 
       <div>
-        <label for="clip_count">Number of clips</label>
+        <label for="clip_count">
+          Number of clips
+        </label>
 
         <select id="clip_count" name="clip_count">
           <option value="3">3 clips</option>
@@ -236,10 +353,13 @@ footer {
 </div>
 
 <div class="panel" id="results" style="display:none">
+
   <div style="font-weight:800;font-size:18px;margin-bottom:8px">
     Your clips
   </div>
+
   <div id="cliplist"></div>
+
 </div>
 
 <footer>
@@ -254,26 +374,131 @@ const form = document.getElementById('form');
 const statusBox = document.getElementById('status');
 const button = document.getElementById('submit');
 
+const urlChoice = document.getElementById('urlChoice');
+const fileChoice = document.getElementById('fileChoice');
+
+const urlSection = document.getElementById('urlSection');
+const fileSection = document.getElementById('fileSection');
+
+const urlInput = document.getElementById('source_url');
+const fileInput = document.getElementById('video_file');
+
 let pollingTimer = null;
 
+
+// --------------------------------------------------
+// SOURCE SELECTION
+// --------------------------------------------------
+
+function setSourceType(type) {
+
+  const useUrl = type === 'url';
+
+  urlChoice.classList.toggle(
+    'active',
+    useUrl
+  );
+
+  fileChoice.classList.toggle(
+    'active',
+    !useUrl
+  );
+
+  urlSection.classList.toggle(
+    'active',
+    useUrl
+  );
+
+  fileSection.classList.toggle(
+    'active',
+    !useUrl
+  );
+
+  urlInput.disabled = !useUrl;
+  fileInput.disabled = useUrl;
+
+  urlInput.required = useUrl;
+  fileInput.required = !useUrl;
+}
+
+urlChoice.addEventListener('click', () => {
+  setSourceType('url');
+});
+
+fileChoice.addEventListener('click', () => {
+  setSourceType('file');
+});
+
+setSourceType('url');
+
+
+// --------------------------------------------------
+// FORM SUBMISSION
+// --------------------------------------------------
+
 form.addEventListener('submit', async e => {
+
   e.preventDefault();
 
   if (pollingTimer) {
     clearTimeout(pollingTimer);
+    pollingTimer = null;
+  }
+
+  const selectedType = document.querySelector(
+    'input[name="source_type"]:checked'
+  ).value;
+
+  // Validate selected source.
+
+  if (selectedType === 'url') {
+
+    if (!urlInput.value.trim()) {
+      statusBox.style.display = 'block';
+      statusBox.textContent =
+        'Please paste a YouTube video link.';
+      return;
+    }
+
+  } else {
+
+    if (!fileInput.files.length) {
+      statusBox.style.display = 'block';
+      statusBox.textContent =
+        'Please select a video file.';
+      return;
+    }
+
+    const file = fileInput.files[0];
+
+    if (file.size > 500 * 1024 * 1024) {
+      statusBox.style.display = 'block';
+      statusBox.textContent =
+        'Video is too large. Maximum size is 500 MB.';
+      return;
+    }
   }
 
   button.disabled = true;
   button.textContent = 'Starting…';
 
   statusBox.style.display = 'block';
-  statusBox.textContent = 'Sending YouTube link…';
+
+  statusBox.textContent =
+    selectedType === 'url'
+      ? 'Sending YouTube link…'
+      : 'Uploading video…';
 
   document.getElementById('results').style.display = 'none';
+
   document.getElementById('cliplist').replaceChildren();
 
   try {
+
     const data = new FormData(form);
+
+    // Do not send the source selection radio field.
+    data.delete('source_type');
 
     const response = await fetch('/api/create', {
       method: 'POST',
@@ -283,24 +508,35 @@ form.addEventListener('submit', async e => {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.detail || 'Could not start job');
+      throw new Error(
+        result.detail || 'Could not start job'
+      );
     }
 
     statusBox.textContent =
-      'Job started. Downloading video and preparing clips…';
+      'Job started. Preparing your video and clips…';
 
     poll(result.job_id);
 
   } catch (error) {
-    statusBox.textContent = 'Error: ' + error.message;
+
+    statusBox.textContent =
+      'Error: ' + error.message;
 
     button.disabled = false;
     button.textContent = '✨ Try Again';
   }
 });
 
+
+// --------------------------------------------------
+// JOB STATUS POLLING
+// --------------------------------------------------
+
 async function poll(id) {
+
   try {
+
     const response = await fetch(
       '/api/status/' + encodeURIComponent(id)
     );
@@ -308,12 +544,16 @@ async function poll(id) {
     const job = await response.json();
 
     if (!response.ok) {
-      throw new Error(job.detail || 'Status check failed');
+      throw new Error(
+        job.detail || 'Status check failed'
+      );
     }
 
     statusBox.textContent =
       (job.status || 'Processing…') +
       (job.error ? ': ' + job.error : '');
+
+    // Job completed.
 
     if (job.status === 'Done') {
 
@@ -331,10 +571,14 @@ async function poll(id) {
         const left = document.createElement('div');
 
         const title = document.createElement('strong');
-        title.textContent = clip.name || 'Gaming Short';
+
+        title.textContent =
+          clip.name || 'Gaming Short';
 
         const meta = document.createElement('div');
+
         meta.className = 'tag';
+
         meta.textContent =
           'From ' + clip.start + 's · ' +
           clip.duration + 's';
@@ -342,8 +586,10 @@ async function poll(id) {
         left.append(title, meta);
 
         const link = document.createElement('a');
+
         link.href = clip.url;
         link.textContent = 'Download MP4 ↓';
+
         link.setAttribute('download', '');
 
         row.append(left, link);
@@ -354,23 +600,35 @@ async function poll(id) {
         'Done! Review your clips before publishing.';
 
       button.disabled = false;
-      button.textContent = '✨ Generate More Shorts';
+
+      button.textContent =
+        '✨ Generate More Shorts';
 
       return;
     }
+
+    // Job failed.
 
     if (job.status === 'Error') {
+
       button.disabled = false;
       button.textContent = '✨ Try Again';
+
       return;
     }
 
-    pollingTimer = setTimeout(() => poll(id), 4000);
+    // Continue checking progress.
+
+    pollingTimer = setTimeout(
+      () => poll(id),
+      4000
+    );
 
   } catch (error) {
 
     statusBox.textContent =
-      'Could not check progress: ' + error.message;
+      'Could not check progress: ' +
+      error.message;
 
     button.disabled = false;
     button.textContent = '✨ Try Again';
